@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box } from '@mui/material';
 import './App.css';
 import NavBar from './components/NavBar';
@@ -11,18 +11,18 @@ import { TokenRounded, TokenSharp } from '@mui/icons-material';
 
 const App = () => {
 
-  const token = localStorage.getItem('token');
+  const [token, setToken] = useState(localStorage.getItem('token'));
 
   const checkLoggedIn = () => {
     if (!token) {
       return false;
     }
-    return true;
+    return true;  
   }
 
   return (
     <>
-      {checkLoggedIn() && <NavBar />}
+      {checkLoggedIn() && <NavBar setToken={setToken} />}
 
       {
         checkLoggedIn()
@@ -35,8 +35,8 @@ const App = () => {
           )
           : (
             <Routes>
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage setToken={setToken} />} />
+              <Route path="/login" element={<LoginPage setToken={setToken} />} />
               <Route path="/" element={<Navigate replace to="/login" />} />
               <Route path="*" element={<Navigate replace to="/login" />} />
             </Routes>

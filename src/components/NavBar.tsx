@@ -1,15 +1,20 @@
-import React from 'react';
+import React, { FC } from 'react';
 import { Box, Toolbar, Typography, Button, AppBar } from "@mui/material";
 import apiClient from "../api/database";
 import { useNavigate } from 'react-router-dom';
 
-const NavBar = () => {
+interface Props {
+    setToken: (token: any) => void;
+}
+
+const NavBar: FC<Props> = ({ setToken }) => {
 
     const navigate = useNavigate();
 
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        setToken(localStorage.getItem('token'));
         navigate('/login');
     };
 

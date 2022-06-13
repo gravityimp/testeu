@@ -8,13 +8,17 @@ import EditModal from "../Modal/EditModal";
 import StatesForm from "../Form/StatesForm";
 import { handleExportJSON, handleExportXML } from "../../api/export";
 import CustomToolbar from "../CustomGridToolbar";
+import { XMLParser } from "fast-xml-parser";
+import { useSnackbar } from "notistack";
 
 
 const StatesGrid = () => {
 
     const [states, setStates] = useState<State[]>([]);
     const [modalOpen, setModalOpen] = useState("");
-    const [selectedState, setSelectedState] = useState<State>({id: 0, name: ""});
+    const [selectedState, setSelectedState] = useState<State>({ id: 0, name: "" });
+
+    const {enqueueSnackbar} = useSnackbar();
 
     const loadStates = () => {
         try {
@@ -68,6 +72,7 @@ const StatesGrid = () => {
                         apiClient.get('/sanctum/csrf-cookie').then(() => {
                             apiClient.delete(`api/state/${params.row.id}`).then(res => {
                                 loadStates();
+                                enqueueSnackbar(`Deleted state [${params.row.id}]`, { variant: 'success' });
                             });
                         });
                     } catch (error) {
@@ -88,8 +93,8 @@ const StatesGrid = () => {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
                 }).then(res => {
-                    console.log(res.data);
                     loadStates();
+                    enqueueSnackbar(`Created state [${name}]`, { variant: 'success' });
                 });
             });
         } catch (error) {
@@ -99,14 +104,16 @@ const StatesGrid = () => {
 
     const exportJSON = () => {
         handleExportJSON("states", states)
+        enqueueSnackbar(`EXPORTED STATES JSON!`, { variant: 'success' });
     };
 
     const exportXML = () => {
         handleExportXML("states", states)
+        enqueueSnackbar(`EXPORTED STATES XML!`, { variant: 'success' });
     }
 
     const Tbar = () => {
-        return <CustomToolbar exportJSON={exportJSON} exportXML={exportXML}/>;
+        return <CustomToolbar exportJSON={exportJSON} exportXML={exportXML} />;
     };
 
     return (
@@ -119,42 +126,80 @@ const StatesGrid = () => {
                     onClick={() => setModalOpen("create")}
                 />
             </Box>
-            <Box sx={{ marginBottom: '4px' }}>
-                <label htmlFor="contained-button-file">
-                    <input
-                        id="contained-button-file"
-                        accept="application/JSON"
-                        style={{ display: 'none' }}
-                        type="file"
-                        onChange={(e: any) => {
-                            const fileReader = new FileReader();
-                            fileReader.readAsText(e.target.files[0], "UTF-8");
-                            fileReader.onload = e => {
-                                const dataImport = JSON.parse(`${e.target?.result}`);
-                                for (let i = 0; i < dataImport.length; i++) {
-                                    const c: State = {
-                                        id: 0,
-                                        name: dataImport[i].name ? dataImport[i].name : "noname"
-                                    }
-                                    try {
-                                        apiClient.get('/sanctum/csrf-cookie').then(() => {
-                                            apiClient.post('api/state', c).then(res => {
-                                                loadStates();
+            <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginBottom: '4px' }}>
+                <Box sx={{ marginX: '4px' }}>
+                    <label htmlFor="contained-button-file">
+                        <input
+                            id="contained-button-file"
+                            accept="application/JSON"
+                            style={{ display: 'none' }}
+                            type="file"
+                            onChange={(e: any) => {
+                                const fileReader = new FileReader();
+                                fileReader.readAsText(e.target.files[0], "UTF-8");
+                                fileReader.onload = e => {
+                                    const dataImport = JSON.parse(`${e.target?.result}`);
+                                    for (let i = 0; i < dataImport.length; i++) {
+                                        const c: State = {
+                                            id: 0,
+                                            name: dataImport[i].name ? dataImport[i].name : "noname"
+                                        }
+                                        try {
+                                            apiClient.get('/sanctum/csrf-cookie').then(() => {
+                                                apiClient.post('api/state', c).then(res => {
+                                                    loadStates();
+                                                    enqueueSnackbar(`Imported JSON!`, { variant: 'success' });
+                                                });
                                             });
-                                        });
-                                    } catch (error) {
-                                        console.log(error);
+                                        } catch (error) {
+                                            console.log(error);
+                                        }
                                     }
-                                }
-                            };
-                        }}
-                    />
-                    <Button variant="contained" component="span">IMPORT JSON</Button>
-                </label>
+                                };
+                            }}
+                        />
+                        <Button variant="contained" component="span">IMPORT JSON</Button>
+                    </label>
+                </Box>
+                <Box sx={{ marginX: '4px' }}>
+                    <label htmlFor="contained-button-xml">
+                        <input
+                            id="contained-button-xml"
+                            accept="application/XML"
+                            style={{ display: 'none' }}
+                            type="file"
+                            onChange={(e: any) => {
+                                const fileReader = new FileReader();
+                                fileReader.readAsText(e.target.files[0], "UTF-8");
+                                fileReader.onload = ev => {
+                                    let parser = new XMLParser();
+                                    let xml = parser.parse(`${ev.target?.result}`).base.element;
+                                    for (let i = 0; i < xml.length; i++) {
+                                        const c: State = {
+                                            id: 0,
+                                            name: xml[i].name ? xml[i].name : "noname"
+                                        }
+                                        try {
+                                            apiClient.get('/sanctum/csrf-cookie').then(() => {
+                                                apiClient.post('api/state', c).then(res => {
+                                                    loadStates();
+                                                    enqueueSnackbar(`Imported XML!`, { variant: 'success' });
+                                                });
+                                            });
+                                        } catch (error) {
+                                            console.log(error);
+                                        }
+                                    }
+                                };
+                            }}
+                        />
+                        <Button variant="contained" component="span">IMPORT XML</Button>
+                    </label>
+                </Box>
             </Box>
-            <div style={{ height: '600px', width: '100%' }}>
-                <DataGrid 
-                    rows={states} 
+            <div style={{ height: '500px', width: '100%' }}>
+                <DataGrid
+                    rows={states}
                     columns={columns}
                     components={{
                         Toolbar: Tbar
@@ -165,10 +210,10 @@ const StatesGrid = () => {
                 {
                     modalOpen == "edit"
                         ? <StatesForm state={selectedState} close={() => setModalOpen("")} loadStates={loadStates} />
-                        : <StatesForm loadStates={loadStates} close={() => setModalOpen("")}/>
+                        : <StatesForm loadStates={loadStates} close={() => setModalOpen("")} />
                 }
             </EditModal>
-        </Box>
+        </Box >
     );
 };
 

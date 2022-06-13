@@ -1,10 +1,11 @@
 import { Box, Typography, FormControl, TextField, InputAdornment, Button } from "@mui/material";
 import axios from "axios";
-import React, { useState } from "react";
+import React, { FC, useState } from "react";
 import { AccountCircle, Lock } from '@mui/icons-material';
 import apiClient from "../api/database";
 import { User } from '../types/types';
 import { useNavigate, Link } from "react-router-dom";
+import { useSnackbar } from "notistack";
 
 const styles = {
     signin_container: {
@@ -68,11 +69,16 @@ const styles = {
     },
 };
 
-const LoginPage = () => {
+interface Props {
+    setToken: (token: any) => void;
+}
+
+const LoginPage: FC<Props> = ({ setToken }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
     const navigate = useNavigate();
+    const { enqueueSnackbar } = useSnackbar();
 
     const handleLogin = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
         e.preventDefault();
@@ -82,10 +88,13 @@ const LoginPage = () => {
                     email,
                     password
                 }).then(res => {
-                    console.log(res.data.access_token);
                     localStorage.setItem('token', res?.data?.access_token);
+                    setToken(localStorage.getItem('token'));
+                    navigate('/');
+                    enqueueSnackbar(`Logged in!`, { variant: 'success' });
                 }).catch(err => {
-                    console.log(err);
+                    enqueueSnackbar(`${err.response.data.message}`, { variant: 'error' });
+                    return;
                 });
             });
         } catch (error) {
@@ -102,8 +111,8 @@ const LoginPage = () => {
                     const _data: User[] = res.data;
                     let id = 0;
                     id = _data.find(u => u.email === email)?.id!;
-                    localStorage.setItem('user', id.toString());
-                });
+                    localStorage.setItem('user', id ? id.toString() : "0");
+                })
             })
         } catch (error) {
             console.log(error);
@@ -143,9 +152,9 @@ const LoginPage = () => {
                                 type='submit'
                                 variant='contained'
                                 color='success'
-                                onClick={async (e) => {
-                                    await handleLogin(e);
-                                    navigate('/');
+                                sx={{ width: '60%' }}
+                                onClick={(e) => {
+                                    handleLogin(e);
                                 }}
                             >
                                 Sign In

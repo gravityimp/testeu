@@ -1,13 +1,15 @@
 import React from 'react';
 import { GridToolbarColumnsButton, GridToolbarContainer, GridToolbarDensitySelector, GridToolbarExport, GridToolbarFilterButton } from "@mui/x-data-grid";
-import { MenuItem, Button } from '@mui/material';
+import { MenuItem, Button, Menu, MenuList } from '@mui/material';
 
 interface CustomToolbarProps {
     exportJSON: () => void;
     exportXML: () => void;
+    allFinancesJSON?: () => void;
+    allFinancesXML?: () => void;
 }
 
-function CustomToolbar({exportJSON, exportXML}: CustomToolbarProps) {
+function CustomToolbar({exportJSON, exportXML, allFinancesJSON, allFinancesXML}: CustomToolbarProps) {
     return (
         <GridToolbarContainer>
             <GridToolbarColumnsButton />
@@ -15,6 +17,12 @@ function CustomToolbar({exportJSON, exportXML}: CustomToolbarProps) {
             <GridToolbarFilterButton />
             <Button onClick={exportJSON}>Export JSON</Button>
             <Button onClick={exportXML}>Export XML</Button>
+            {
+                allFinancesJSON && <Button onClick={allFinancesJSON}>Export All JSON</Button>
+            }
+            {
+                allFinancesXML && <Button onClick={allFinancesXML}>Export All XML</Button>
+            }
         </GridToolbarContainer>
     );
 }

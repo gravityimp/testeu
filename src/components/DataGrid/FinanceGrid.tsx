@@ -6,8 +6,10 @@ import { DataGrid, GridColDef, GridToolbar } from '@mui/x-data-grid';
 import { Close, Edit, Add } from '@mui/icons-material';
 import FinanceForm from "../Form/FinanceForm";
 import EditModal from "../Modal/EditModal";
-import { handleExportJSON, handleExportXML } from "../../api/export";
+import { handleExportAllJSON, handleExportAllXML, handleExportJSON, handleExportXML } from "../../api/export";
 import CustomToolbar from "../CustomGridToolbar";
+import { XMLParser } from "fast-xml-parser";
+import { useSnackbar } from "notistack";
 
 interface FinanceGridProps {
     admin: boolean;
@@ -19,7 +21,7 @@ interface FinanceGridProps {
 const FinanceGrid: FC<FinanceGridProps> = ({ admin, gridHeight, selectedCategories, selectedStates }) => {
 
     const [finances, setFinances] = useState<Finance[]>([]);
-    const [page, setPage] = useState(1);
+    const [page, setPage] = useState(0);
     const [maxPages, setMaxPages] = useState(1);
 
     const [modalOpen, setModalOpen] = useState("");
@@ -35,17 +37,18 @@ const FinanceGrid: FC<FinanceGridProps> = ({ admin, gridHeight, selectedCategori
         id_state: 0,
     });
 
+    const {enqueueSnackbar} = useSnackbar();
+
     const loadFinances = () => {
         try {
             apiClient.get('/sanctum/csrf-cookie').then(() => {
-                apiClient.get(`api/finances/?page=${page}`, {
+                apiClient.get(`api/finances/?page=${page + 1}`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
                 }).then(res => {
-                    setMaxPages(res.data.last_page);
                     setFinances(res.data.data);
-                    console.log(res.data.last_page);
+                    setMaxPages(res.data.total);
                 });
             });
         } catch (error) {
@@ -53,26 +56,9 @@ const FinanceGrid: FC<FinanceGridProps> = ({ admin, gridHeight, selectedCategori
         }
     };
 
-    const getMaxPages = () => {
-        try {
-            apiClient.get('/sanctum/csrf-cookie').then(() => {
-                apiClient.get(`api/finances`, {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                }).then(res => {
-                    setMaxPages(res.data.last_page);
-                });
-            });
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
     useEffect(() => {
-        getMaxPages();
         loadFinances();
-    }, []);
+    }, [page]);
 
     const columns: GridColDef[] = [
         { field: 'id', headerName: 'ID', width: 75 },
@@ -107,6 +93,7 @@ const FinanceGrid: FC<FinanceGridProps> = ({ admin, gridHeight, selectedCategori
                         apiClient.get('/sanctum/csrf-cookie').then(() => {
                             apiClient.delete(`api/finances/${params.row.id}`).then(res => {
                                 loadFinances();
+                                enqueueSnackbar(`Deleted finance [${params.row.id}]`, { variant: 'success' });
                             });
                         });
                     } catch (error) {
@@ -180,15 +167,33 @@ const FinanceGrid: FC<FinanceGridProps> = ({ admin, gridHeight, selectedCategori
     });
 
     const exportJSON = () => {
-        handleExportJSON("finances", filteredFinances)
+        handleExportJSON("finances", filteredFinances);
+        enqueueSnackbar(`EXPORTED FINANCES JSON PAGE ${page}!`, { variant: 'success' });
     };
 
     const exportXML = () => {
-        handleExportXML("finances", filteredFinances)
-    }
+        handleExportXML("finances", filteredFinances);
+        enqueueSnackbar(`EXPORTED FINANCES XML PAGE ${page}!`, { variant: 'success' });
+    };
+
+    const exportAllFinancesJSON = () => {
+        handleExportAllJSON("all-finances");
+        enqueueSnackbar(`EXPORTED FINANCES JSON!`, { variant: 'success' });
+    };
+
+    const exportAllFinancesXML = () => {
+        handleExportAllXML("all-finances");
+        enqueueSnackbar(`EXPORTED FINANCES XML!`, { variant: 'success' });
+    };
 
     const Tbar = () => {
-        return <CustomToolbar exportJSON={exportJSON} exportXML={exportXML} />;
+        return ( 
+            <CustomToolbar 
+                exportJSON={exportJSON} 
+                exportXML={exportXML} 
+                allFinancesJSON={exportAllFinancesJSON}
+                allFinancesXML={exportAllFinancesXML}
+            /> );
     };
 
     return (
@@ -207,61 +212,110 @@ const FinanceGrid: FC<FinanceGridProps> = ({ admin, gridHeight, selectedCategori
             }
             {
                 admin && (
-                    <Box sx={{ marginBottom: '4px' }}>
-                        <label htmlFor="contained-button-file">
-                            <input
-                                id="contained-button-file"
-                                accept="application/JSON"
-                                style={{ display: 'none' }}
-                                type="file"
-                                onChange={(e: any) => {
-                                    const fileReader = new FileReader();
-                                    fileReader.readAsText(e.target.files[0], "UTF-8");
-                                    fileReader.onload = e => {
-                                        const dataImport = JSON.parse(`${e.target?.result}`);
-                                        for (let i = 0; i < dataImport.length; i++) {
-                                            const f: Finance = {
-                                                id: 0,
-                                                title: dataImport[i].title ? dataImport[i].title : "noname",
-                                                organization: dataImport[i].organization ? dataImport[i].organization : "noorg",
-                                                total_value: dataImport[i].total_value ? dataImport[i].total_value : 0,
-                                                added_value: dataImport[i].added_value ? dataImport[i].added_value : 0,
-                                                id_state: dataImport[i].id_state ? dataImport[i].id_state : 0,
-                                                id_category: dataImport[i].id_category ? dataImport[i].id_category : 0,
-                                                state_name: dataImport[i].state_name ? dataImport[i].state_name : "nostate",
-                                                category_name: dataImport[i].category_name ? dataImport[i].category_name : "nocategory"
-                                            }
-                                            try {
-                                                apiClient.get('/sanctum/csrf-cookie').then(() => {
-                                                    apiClient.post('api/finances', f).then(res => {
-                                                        loadFinances();
+                    <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginBottom: '4px' }}>
+                        <Box sx={{ marginX: '4px' }}>
+                            <label htmlFor="contained-button-file">
+                                <input
+                                    id="contained-button-file"
+                                    accept="application/JSON"
+                                    style={{ display: 'none' }}
+                                    type="file"
+                                    onChange={(e: any) => {
+                                        const fileReader = new FileReader();
+                                        fileReader.readAsText(e.target.files[0], "UTF-8");
+                                        fileReader.onload = e => {
+                                            const dataImport = JSON.parse(`${e.target?.result}`);
+                                            for (let i = 0; i < dataImport.length; i++) {
+                                                const f: Finance = {
+                                                    id: 0,
+                                                    title: dataImport[i].title ? dataImport[i].title : "noname",
+                                                    organization: dataImport[i].organization ? dataImport[i].organization : "noorg",
+                                                    total_value: dataImport[i].total_value ? dataImport[i].total_value : 0,
+                                                    added_value: dataImport[i].added_value ? dataImport[i].added_value : 0,
+                                                    id_state: dataImport[i].id_state ? dataImport[i].id_state : 0,
+                                                    id_category: dataImport[i].id_category ? dataImport[i].id_category : 0,
+                                                    state_name: dataImport[i].state_name ? dataImport[i].state_name : "nostate",
+                                                    category_name: dataImport[i].category_name ? dataImport[i].category_name : "nocategory"
+                                                }
+                                                try {
+                                                    apiClient.get('/sanctum/csrf-cookie').then(() => {
+                                                        apiClient.post('api/finances', f).then(res => {
+                                                            loadFinances();
+                                                            enqueueSnackbar(`IMPORTED JSON!`, { variant: 'success' });
+                                                        });
                                                     });
-                                                });
-                                            } catch (error) {
-                                                console.log(error);
+                                                } catch (error) {
+                                                    console.log(error);
+                                                }
                                             }
-                                        }
-                                    };
-                                }}
-                            />
-                            <Button variant="contained" component="span">IMPORT JSON</Button>
-                        </label>
+                                        };
+                                    }}
+                                />
+                                <Button variant="contained" component="span">IMPORT JSON</Button>
+                            </label>
+                        </Box>
+                        <Box sx={{ marginX: '4px' }}>
+                            <label htmlFor="contained-button-xml">
+                                <input
+                                    id="contained-button-xml"
+                                    accept="application/XML"
+                                    style={{ display: 'none' }}
+                                    type="file"
+                                    onChange={(e: any) => {
+                                        const fileReader = new FileReader();
+                                        fileReader.readAsText(e.target.files[0], "UTF-8");
+                                        fileReader.onload = ev => {
+                                            let parser = new XMLParser();
+                                            let xml = parser.parse(`${ev.target?.result}`).base.element;
+                                            for (let i = 0; i < xml.length; i++) {
+                                                const f: Finance = {
+                                                    id: 0,
+                                                    title: xml[i].title ? xml[i].title : "noname",
+                                                    organization: xml[i].organization ? xml[i].organization : "noorg",
+                                                    total_value: xml[i].total_value ? xml[i].total_value : 0,
+                                                    added_value: xml[i].added_value ? xml[i].added_value : 0,
+                                                    id_state: xml[i].id_state ? xml[i].id_state : 0,
+                                                    id_category: xml[i].id_category ? xml[i].id_category : 0,
+                                                    state_name: xml[i].state_name ? xml[i].state_name : "nostate",
+                                                    category_name: xml[i].category_name ? xml[i].category_name : "nocategory",
+                                                }
+                                                try {
+                                                    apiClient.get('/sanctum/csrf-cookie').then(() => {
+                                                        apiClient.post('api/finances', f).then(res => {
+                                                            loadFinances();
+                                                            enqueueSnackbar(`IMPORTED XML!`, { variant: 'success' });
+                                                        });
+                                                    });
+                                                } catch (error) {
+                                                    console.log(error);
+                                                }
+                                            }
+                                        };
+                                    }}
+                                />
+                                <Button variant="contained" component="span">IMPORT XML</Button>
+                            </label>
+                        </Box>
                     </Box>
                 )
             }
             <div style={{ height: `${'600px' && gridHeight}`, width: '100%' }}>
                 <DataGrid
-                    paginationMode="server"
+                    rows={filteredFinances}
+                    rowCount={maxPages}
+                    rowsPerPageOptions={[9]}
+                    pagination
                     page={page}
                     pageSize={10}
-                    rowCount={maxPages}
-                    rowsPerPageOptions={[10]}
+                    paginationMode="server"
+                    onPageChange={(newPage) => {
+                        console.log("NEW PAGE", newPage)
+                        setPage(newPage ? newPage : 0)
+                    }}
+                    columns={columns}
                     components={{
                         Toolbar: Tbar
                     }}
-                    rows={filteredFinances}
-                    columns={columns}
-                    onPageChange={(newPage) => setPage(newPage ? newPage : 1)}
                 />
             </div>
             <EditModal isOpen={modalOpen !== ""} onClose={() => setModalOpen("")}>

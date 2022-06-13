@@ -8,6 +8,7 @@ import EditModal from "../Modal/EditModal";
 import UserForm from "../Form/UserForm";
 import { handleExportJSON, handleExportXML } from "../../api/export";
 import CustomToolbar from "../CustomGridToolbar";
+import { useSnackbar } from "notistack";
 
 
 const UserGrid = () => {
@@ -19,6 +20,8 @@ const UserGrid = () => {
         name: "",
         email: "",
     });
+
+    const { enqueueSnackbar } = useSnackbar();
 
     const loadUsers = () => {
         try {
@@ -89,6 +92,7 @@ const UserGrid = () => {
                         apiClient.get('/sanctum/csrf-cookie').then(() => {
                             apiClient.delete(`api/user/${params.row.id}`).then(res => {
                                 loadUsers();
+                                enqueueSnackbar(`DELETED USER [${params.row.name} ID: ${params.row.id}]!`, { variant: 'success' });
                             });
                         });
                     } catch (error) {
@@ -102,11 +106,13 @@ const UserGrid = () => {
     ];
 
     const exportJSON = () => {
-        handleExportJSON("users", users)
+        handleExportJSON("users", users);
+        enqueueSnackbar(`EXPORTED USERS JSON!`, { variant: 'success' });
     };
 
     const exportXML = () => {
-        handleExportXML("users", users)
+        handleExportXML("users", users);
+        enqueueSnackbar(`EXPORTED USERS XML!`, { variant: 'success' });
     }
 
     const Tbar = () => {

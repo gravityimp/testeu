@@ -1,11 +1,12 @@
 import { Box, Typography, Button, FormControl, TextField, InputAdornment, FormGroup, Checkbox } from "@mui/material";
-import React, { useState } from "react";
+import React, { FC, useState } from "react";
 import { AccountCircle, Lock } from '@mui/icons-material';
 import TermsModal from "../components/Modal/TermsModal";
 import axios from 'axios';
 import apiClient from "../api/database";
 import { User } from "../types/types";
 import { useNavigate } from "react-router-dom";
+import { useSnackbar } from "notistack";
 
 const styles = {
     signup_container: {
@@ -68,7 +69,12 @@ const styles = {
     },
 };
 
-const RegisterPage = () => {
+interface Props {
+    setToken: (token: any) => void;
+}
+
+const RegisterPage: FC<Props> = ({ setToken }) => {
+
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -77,6 +83,7 @@ const RegisterPage = () => {
     const [termsModal, setTermsModal] = useState(false);
 
     const navigate = useNavigate();
+    const {enqueueSnackbar} = useSnackbar();
 
     const nameValidation = () => {
         if (name.length < 3) {
@@ -117,8 +124,8 @@ const RegisterPage = () => {
 
     const sucessValidation = () => {
         if (
-            nameValidation() === 'Looking Good' && 
-            emailValidation() === 'Looking Good' && 
+            nameValidation() === 'Looking Good' &&
+            emailValidation() === 'Looking Good' &&
             passwordValidation() === 'Looking Good' &&
             passwordConfirmValidation() === 'Looking Good' &&
             checkedTerms
@@ -139,6 +146,7 @@ const RegisterPage = () => {
                     password_confirmation: password,
                 }).then(res => {
                     localStorage.setItem('token', res?.data?.access_token);
+                    setToken(localStorage.getItem('token'));
                     apiClient.get('api/user', {
                         headers: {
                             Authorization: `Bearer ${res?.data?.access_token}`,
@@ -148,6 +156,7 @@ const RegisterPage = () => {
                         let id = 0;
                         id = _data.find(u => u.email === email)?.id!;
                         localStorage.setItem('user', id.toString());
+                        enqueueSnackbar(`Registered! `, { variant: 'success' });
                     });
                 }).catch(err => {
                     console.log(err);
@@ -157,7 +166,6 @@ const RegisterPage = () => {
             console.log(error);
         }
         navigate('/');
-        window.location.reload();
     };
 
     return (
@@ -165,9 +173,8 @@ const RegisterPage = () => {
             <Box sx={styles.signup_form}>
                 <Box sx={styles.left}>
                     <Typography sx={styles.left_h1}>Already have an account?</Typography>
-                    {/* <Link to='/login'> */}
-                    <Button 
-                        sx={{ width: '180px', my: '10px' }} 
+                    <Button
+                        sx={{ width: '180px', my: '10px' }}
                         variant='contained'
                         onClick={() => navigate('/login')}
                     >

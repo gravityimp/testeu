@@ -8,13 +8,16 @@ import CategoryForm from "../Form/CategoryForm";
 import EditModal from "../Modal/EditModal";
 import { handleExportJSON, handleExportXML } from "../../api/export";
 import CustomToolbar from "../CustomGridToolbar";
-
+import { XMLParser } from "fast-xml-parser";
+import { useSnackbar } from "notistack";
 
 const CategoryGrid = () => {
 
     const [categories, setCategories] = useState<Category[]>([]);
     const [modalOpen, setModalOpen] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<Category>({ id: 0, name: "" });
+
+    const { enqueueSnackbar } = useSnackbar();
 
     const loadCategories = () => {
         try {
@@ -68,6 +71,7 @@ const CategoryGrid = () => {
                         apiClient.get('/sanctum/csrf-cookie').then(() => {
                             apiClient.delete(`api/category/${params.row.id}`).then(res => {
                                 loadCategories();
+                                enqueueSnackbar(`Deleted category [${params.row.id}]`, { variant: 'success' });
                             });
                         });
                     } catch (error) {
@@ -81,15 +85,17 @@ const CategoryGrid = () => {
     ];
 
     const exportJSON = () => {
-        handleExportJSON("categories", categories)
+        handleExportJSON("categories", categories);
+        enqueueSnackbar(`EXPORTED CATEGORIES JSON!`, { variant: 'success' });
     };
 
     const exportXML = () => {
-        handleExportXML("categories", categories)
+        handleExportXML("categories", categories);
+        enqueueSnackbar(`EXPORTED CATEGORIES XML`, { variant: 'success' });
     }
 
     const Tbar = () => {
-        return <CustomToolbar exportJSON={exportJSON} exportXML={exportXML} />;
+        return <CustomToolbar exportJSON={exportJSON} exportXML={exportXML}/>;
     };
 
     return (
@@ -97,45 +103,83 @@ const CategoryGrid = () => {
             <Box sx={{ position: 'absolute', right: 0, bottom: 0, transform: 'translateX(-50%)' }}>
                 <SpeedDial
                     ariaLabel="SpeedDial basic example"
-                    sx={{ position: 'absolute', bottom: 16, right: 16, zIndex: 999 }}
+                    sx={{ position: 'absolute', bottom: 16, right: 16, zIndex: 99 }}
                     icon={<Add />}
                     onClick={() => setModalOpen("create")}
                 />
             </Box>
-            <Box sx={{ margin: '4px' }}>
-                <label htmlFor="contained-button-file">
-                    <input
-                        id="contained-button-file"
-                        accept="application/JSON"
-                        style={{ display: 'none' }}
-                        type="file"
-                        onChange={(e: any) => {
-                            const fileReader = new FileReader();
-                            fileReader.readAsText(e.target.files[0], "UTF-8");
-                            fileReader.onload = e => {
-                                const dataImport = JSON.parse(`${e.target?.result}`);
-                                for (let i = 0; i < dataImport.length; i++) {
-                                    const c: Category = {
-                                        id: 0,
-                                        name: dataImport[i].name ? dataImport[i].name : "noname"
-                                    }
-                                    try {
-                                        apiClient.get('/sanctum/csrf-cookie').then(() => {
-                                            apiClient.post('api/category', c).then(res => {
-                                                loadCategories();
+            <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginBottom: '4px' }}>
+                <Box sx={{ marginX: '4px' }}>
+                    <label htmlFor="contained-button-file">
+                        <input
+                            id="contained-button-file"
+                            accept="application/JSON"
+                            style={{ display: 'none' }}
+                            type="file"
+                            onChange={(e: any) => {
+                                const fileReader = new FileReader();
+                                fileReader.readAsText(e.target.files[0], "UTF-8");
+                                fileReader.onload = e => {
+                                    const dataImport = JSON.parse(`${e.target?.result}`);
+                                    for (let i = 0; i < dataImport.length; i++) {
+                                        const c: Category = {
+                                            id: 0,
+                                            name: dataImport[i].name ? dataImport[i].name : "noname"
+                                        }
+                                        try {
+                                            apiClient.get('/sanctum/csrf-cookie').then(() => {
+                                                apiClient.post('api/category', c).then(res => {
+                                                    loadCategories();
+                                                    enqueueSnackbar(`Loaded JSON!`, { variant: 'success' });
+                                                });
                                             });
-                                        });
-                                    } catch (error) {
-                                        console.log(error);
+                                        } catch (error) {
+                                            console.log(error);
+                                        }
                                     }
-                                }
-                            };
-                        }}
-                    />
-                    <Button variant="contained" component="span">IMPORT JSON</Button>
-                </label>
+                                };
+                            }}
+                        />
+                        <Button variant="contained" component="span">IMPORT JSON</Button>
+                    </label>
+                </Box>
+                <Box sx={{ marginX: '4px' }}>
+                    <label htmlFor="contained-button-xml">
+                        <input
+                            id="contained-button-xml"
+                            accept="application/XML"
+                            style={{ display: 'none' }}
+                            type="file"
+                            onChange={(e: any) => {
+                                const fileReader = new FileReader();
+                                fileReader.readAsText(e.target.files[0], "UTF-8");
+                                fileReader.onload = ev => {
+                                    let parser = new XMLParser();
+                                    let xml = parser.parse(`${ev.target?.result}`).base.element;
+                                    for (let i = 0; i < xml.length; i++) {
+                                        const c: Category = {
+                                            id: 0,
+                                            name: xml[i].name ? xml[i].name : "noname"
+                                        }
+                                        try {
+                                            apiClient.get('/sanctum/csrf-cookie').then(() => {
+                                                apiClient.post('api/category', c).then(res => {
+                                                    loadCategories();
+                                                    enqueueSnackbar(`Loaded XML!`, { variant: 'success' });
+                                                });
+                                            });
+                                        } catch (error) {
+                                            console.log(error);
+                                        }
+                                    }
+                                };
+                            }}
+                        />
+                        <Button variant="contained" component="span">IMPORT XML</Button>
+                    </label>
+                </Box>
             </Box>
-            <div style={{ height: '600px', width: '100%' }}>
+            <div style={{ height: '500px', width: '100%' }}>
                 <DataGrid
                     rows={categories}
                     columns={columns}
